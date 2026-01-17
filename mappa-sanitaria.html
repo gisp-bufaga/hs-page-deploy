@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Sanitaria - Farmacie e Ospedali</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css' type='text/css' />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        
+        .map-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1;
+            max-width: 300px;
+        }
+        
+        .map-overlay h3 {
+            margin-bottom: 15px;
+            color: #1a73e8;
+            font-size: 18px;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .filter-group input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .locate-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            transition: background 0.3s;
+        }
+        
+        .locate-btn:hover {
+            background: #1557b0;
+        }
+        
+        .locate-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .marker {
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .marker.farmacia {
+            background: #10b981;
+        }
+        
+        .marker.ospedale {
+            background: #ef4444;
+        }
+        
+        .marker.pronto-soccorso {
+            background: #f59e0b;
+        }
+        
+        .mapboxgl-popup-content {
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+        
+        .popup-title {
+            font-weight: 600;
+            color: #111;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        
+        .popup-info {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .popup-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .popup-type.farmacia {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .popup-type.ospedale {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .popup-type.pronto-soccorso {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .legend {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .legend-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #666;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .geocoder-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1;
+            width: 300px;
+        }
+        
+        .mapboxgl-ctrl-geocoder {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="map-overlay">
+        <h3>🏥 Servizi Sanitari</h3>
+        
+        <button id="locate-btn" class="locate-btn">📍 Trova la mia posizione</button>
+        
+        <div class="filter-group">
+            <label>
+                <input type="checkbox" id="filter-farmacia" checked>
+                <span>Farmacie</span>
+            </label>
+            <label>
+                <input type="checkbox" id="filter-ospedale" checked>
+                <span>Ospedali</span>
+            </label>
+            <label>
+                <input type="checkbox" id="filter-ps" checked>
+                <span>Pronto Soccorso</span>
+            </label>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-title">Legenda</div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #10b981;"></div>
+                <span>Farmacia</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ef4444;"></div>
+                <span>Ospedale</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f59e0b;"></div>
+                <span>Pronto Soccorso</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="geocoder" class="geocoder-container"></div>
+
+    <script>
+        // IMPORTANTE: Sostituisci con il tuo token Mapbox
+        // Ottienilo gratuitamente su: https://account.mapbox.com/
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZ2lwYmYiLCJhIjoiY21raGN5NTk4MGZvNjNmcXk5cm5xcGMwcCJ9.9W91wFnKSCu38RBuvr1m1A';
+        
+        // Inizializza la mappa centrata su Roma
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [12.4964, 41.9028], // Roma
+            zoom: 12
+        });
+        
+        // Dati di esempio - Strutture sanitarie nel Lazio
+        const locations = {
+            farmacie: [
+                { name: 'Farmacia Vaticano', coords: [12.4534, 41.9029], address: 'Via di Porta Angelica, 1', hours: '8:30-20:00' },
+                { name: 'Farmacia Internazionale', coords: [12.4823, 41.8989], address: 'Piazza Barberini, 49', hours: 'H24' },
+                { name: 'Farmacia Prati', coords: [12.4598, 41.9065], address: 'Via Cola di Rienzo, 213', hours: '8:00-20:30' },
+                { name: 'Farmacia Centrale', coords: [12.4924, 41.8986], address: 'Via del Corso, 159', hours: '8:30-19:30' },
+                { name: 'Farmacia Esquilino', coords: [12.4983, 41.8969], address: 'Via Merulana, 45', hours: '8:00-20:00' }
+            ],
+            ospedali: [
+                { name: 'Policlinico Umberto I', coords: [12.5151, 41.9021], address: 'Viale del Policlinico, 155', beds: '1200 posti letto' },
+                { name: 'Ospedale San Camillo', coords: [12.4561, 41.8711], address: 'Circonvallazione Gianicolense, 87', beds: '850 posti letto' },
+                { name: 'Policlinico Gemelli', coords: [12.4363, 41.9304], address: 'Largo Agostino Gemelli, 8', beds: '1500 posti letto' },
+                { name: 'Ospedale San Giovanni', coords: [12.5183, 41.8808], address: 'Via dell\'Amba Aradam, 9', beds: '750 posti letto' }
+            ],
+            prontoSoccorso: [
+                { name: 'PS Policlinico Umberto I', coords: [12.5151, 41.9021], address: 'Viale del Policlinico, 155', waitTime: '45 min' },
+                { name: 'PS Gemelli', coords: [12.4363, 41.9304], address: 'Largo Agostino Gemelli, 8', waitTime: '30 min' },
+                { name: 'PS San Camillo', coords: [12.4561, 41.8711], address: 'Circonvallazione Gianicolense, 87', waitTime: '60 min' }
+            ]
+        };
+        
+        const markers = [];
+        
+        // Aggiungi controllo di navigazione
+        map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+        
+        // Aggiungi controllo di geolocalizzazione
+        const geolocate = new mapboxgl.GeolocateControl({
+            positionOptions: {
+                enableHighAccuracy: true
+            },
+            trackUserLocation: true,
+            showUserHeading: true
+        });
+        map.addControl(geolocate, 'bottom-right');
+        
+        // Aggiungi barra di ricerca
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            mapboxgl: mapboxgl,
+            placeholder: 'Cerca un indirizzo a Roma...',
+            countries: 'it',
+            bbox: [12.3, 41.7, 12.7, 42.1], // Limita a zona Roma
+            language: 'it'
+        });
+        
+        document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
+        
+        // Funzione per creare marker
+        function createMarker(location, type) {
+            const el = document.createElement('div');
+            el.className = `marker ${type}`;
+            el.innerHTML = type === 'farmacia' ? '💊' : (type === 'ospedale' ? '🏥' : '🚑');
+            
+            let popupContent = `
+                <div>
+                    <div class="popup-type ${type}">${type}</div>
+                    <div class="popup-title">${location.name}</div>
+                    <div class="popup-info">
+                        📍 ${location.address}<br>
+            `;
+            
+            if (location.hours) popupContent += `🕐 ${location.hours}<br>`;
+            if (location.beds) popupContent += `🛏️ ${location.beds}<br>`;
+            if (location.waitTime) popupContent += `⏱️ Attesa: ${location.waitTime}`;
+            
+            popupContent += `</div></div>`;
+            
+            const popup = new mapboxgl.Popup({ offset: 25 })
+                .setHTML(popupContent);
+            
+            const marker = new mapboxgl.Marker(el)
+                .setLngLat(location.coords)
+                .setPopup(popup)
+                .addTo(map);
+            
+            markers.push({ marker, type });
+        }
+        
+        // Carica tutti i marker
+        map.on('load', () => {
+            locations.farmacie.forEach(loc => createMarker(loc, 'farmacia'));
+            locations.ospedali.forEach(loc => createMarker(loc, 'ospedale'));
+            locations.prontoSoccorso.forEach(loc => createMarker(loc, 'pronto-soccorso'));
+        });
+        
+        // Gestione filtri
+        document.querySelectorAll('.filter-group input').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const type = e.target.id.replace('filter-', '');
+                const isChecked = e.target.checked;
+                
+                markers.forEach(({ marker, type: markerType }) => {
+                    if (markerType === type) {
+                        marker.getElement().style.display = isChecked ? 'flex' : 'none';
+                    }
+                });
+            });
+        });
+        
+        // Pulsante geolocalizzazione
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            const btn = document.getElementById('locate-btn');
+            btn.disabled = true;
+            btn.textContent = '🔍 Ricerca in corso...';
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        
+                        map.flyTo({
+                            center: [longitude, latitude],
+                            zoom: 14,
+                            essential: true
+                        });
+                        
+                        // Aggiungi marker posizione utente
+                        new mapboxgl.Marker({ color: '#1a73e8' })
+                            .setLngLat([longitude, latitude])
+                            .setPopup(new mapboxgl.Popup().setHTML('<strong>La tua posizione</strong>'))
+                            .addTo(map);
+                        
+                        btn.textContent = '✓ Posizione trovata';
+                        setTimeout(() => {
+                            btn.textContent = '📍 Trova la mia posizione';
+                            btn.disabled = false;
+                        }, 2000);
+                    },
+                    (error) => {
+                        alert('Impossibile rilevare la posizione. Verifica i permessi del browser.');
+                        btn.textContent = '📍 Trova la mia posizione';
+                        btn.disabled = false;
+                    }
+                );
+            } else {
+                alert('Geolocalizzazione non supportata dal tuo browser');
+                btn.textContent = '📍 Trova la mia posizione';
+                btn.disabled = false;
+            }
+        });
+        
+        // Geolocalizzazione automatica all'avvio (opzionale)
+        setTimeout(() => {
+            geolocate.trigger();
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "public": true,
+  "github": {
+    "silent": true
+  },
+  "headers": [
+    {
+      "source": "/chunks/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=300"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/ps",
+      "destination": "/api/pronto-soccorso"
+    }
+  ]
+}

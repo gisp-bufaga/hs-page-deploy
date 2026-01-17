@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cerca Farmaco - Database AIFA (Ottimizzato)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #111;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        
+        .search-container {
+            background: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 99;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 50px 14px 20px;
+            font-size: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            transition: border 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .search-icon {
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #9ca3af;
+        }
+        
+        .filters-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        
+        .filter-tab {
+            padding: 8px 16px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .filter-tab:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
+        .filter-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .sort-select {
+            padding: 8px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            background: white;
+        }
+        
+        .results-container {
+            background: white;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            border-bottom: 2px solid #f3f4f6;
+            flex-shrink: 0;
+        }
+        
+        .results-count {
+            font-size: 15px;
+            font-weight: 600;
+            color: #111;
+        }
+        
+        .results-count span {
+            color: #667eea;
+        }
+        
+        .results-info {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        
+        .results-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .results-list {
+            padding: 15px 30px 30px;
+        }
+        
+        .drug-card {
+            border: 2px solid #f3f4f6;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+            cursor: pointer;
+            background: white;
+        }
+        
+        .drug-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+        
+        .drug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+        
+        .drug-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111;
+            margin-bottom: 4px;
+        }
+        
+        .drug-active {
+            color: #667eea;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .drug-badge {
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        
+        .badge-ricetta {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-sop {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-otc {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .drug-info {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .drug-info-row {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .info-value {
+            color: #6b7280;
+        }
+        
+        .drug-details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f3f4f6;
+            display: none;
+        }
+        
+        .drug-card.expanded .drug-details {
+            display: block;
+        }
+        
+        .expand-icon {
+            transition: transform 0.3s;
+            font-size: 16px;
+            color: #9ca3af;
+            margin-left: 10px;
+        }
+        
+        .drug-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+        
+        .no-results-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .no-results h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 16px;
+        }
+        
+        .loading-more {
+            text-align: center;
+            padding: 20px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+        
+        /* Scrollbar personalizzata */
+        .results-wrapper::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .results-wrapper::-webkit-scrollbar-track {
+            background: #f3f4f6;
+        }
+        
+        .results-wrapper::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        
+        .results-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header, .search-container, .results-list {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            
+            .drug-info-row {
+                grid-template-columns: 1fr;
+                gap: 2px;
+            }
+            
+            .info-label {
+                margin-bottom: 2px;
+            }
+            
+            .drug-header {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .filters-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .sort-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💊 Cerca Farmaco</h1>
+            <p>Database AIFA - <span id="total-drugs">0</span> farmaci autorizzati</p>
+        </div>
+        
+        <div class="search-container">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    class="search-input" 
+                    placeholder="Cerca per nome farmaco, principio attivo o codice ATC..."
+                    autocomplete="off"
+                >
+                <span class="search-icon">🔍</span>
+            </div>
+            
+            <div class="filters-row">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">Tutti</button>
+                    <button class="filter-tab" data-filter="ricetta">Su Ricetta</button>
+                    <button class="filter-tab" data-filter="sop">SOP</button>
+                    <button class="filter-tab" data-filter="otc">OTC/Banco</button>
+                </div>
+                <select class="sort-select" id="sort-select">
+                    <option value="name">Per nome</option>
+                    <option value="active">Per principio attivo</option>
+                    <option value="type">Per tipo</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="results-container">
+            <div class="results-header">
+                <div class="results-count">
+                    <span id="results-count">0</span> risultati
+                </div>
+                <div class="results-info">
+                    Mostrando <span id="showing-count">0</span> di <span id="filtered-count">0</span>
+                </div>
+            </div>
+            
+            <div class="results-wrapper" id="results-wrapper">
+                <div class="results-list" id="results">
+                    <div class="loading">Caricamento database farmaci...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAZIONE
+        const ITEMS_PER_PAGE = 50; // Numero di farmaci da caricare per volta
+        const LOAD_MORE_THRESHOLD = 300; // Pixel dal fondo per caricare altri risultati
+        
+        // Stato applicazione
+        let drugsDatabase = [];
+        let filteredDrugs = [];
+        let displayedDrugs = [];
+        let currentFilter = 'all';
+        let currentSort = 'name';
+        let currentPage = 0;
+        let isLoading = false;
+        let searchTimeout = null;
+        
+        // Elementi DOM
+        const searchInput = document.getElementById('search-input');
+        const resultsDiv = document.getElementById('results');
+        const resultsWrapper = document.getElementById('results-wrapper');
+        const resultsCount = document.getElementById('results-count');
+        const showingCount = document.getElementById('showing-count');
+        const filteredCount = document.getElementById('filtered-count');
+        const totalDrugsSpan = document.getElementById('total-drugs');
+        const filterTabs = document.querySelectorAll('.filter-tab');
+        const sortSelect = document.getElementById('sort-select');
+        
+        // Carica database farmaci
+        async function loadDrugsDatabase() {
+            try {
+                // OPZIONE 1: Carica da file JSON esterno
+                // const response = await fetch('farmaci_database.json');
+                // drugsDatabase = await response.json();
+                
+                // OPZIONE 2: Carica da API
+                // const response = await fetch('https://tuoserver.com/api/farmaci');
+                // drugsDatabase = await response.json();
+                
+                // OPZIONE 3: Database inline (per sviluppo/demo)
+                // Per produzione, sostituisci con OPZIONE 1 o 2
+                drugsDatabase = generateSampleDatabase();
+                
+                totalDrugsSpan.textContent = drugsDatabase.length.toLocaleString('it-IT');
+                
+                // Inizializza ricerca
+                performSearch();
+                
+            } catch (error) {
+                console.error('Errore caricamento database:', error);
+                resultsDiv.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">⚠️</div>
+                        <h3>Errore nel caricamento</h3>
+                        <p>Impossibile caricare il database farmaci</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Genera database di esempio (sostituire con dati reali)
+        function generateSampleDatabase() {
+            const sampleDrugs = [];
+            const names = [
+                'TACHIPIRINA', 'ASPIRINA', 'MOMENT', 'AUGMENTIN', 'EUTIROX',
+                'BRUFEN', 'VOLTAREN', 'GAVISCON', 'BUSCOPAN', 'XANAX',
+                'LEXOTAN', 'CARDIOASPIRIN', 'OKI', 'DIFLUCAN', 'TORADOL'
+            ];
+            const actives = [
+                'Paracetamolo', 'Acido acetilsalicilico', 'Ibuprofene', 
+                'Amoxicillina', 'Levotiroxina', 'Diclofenac', 'Ketoprofene'
+            ];
+            const types = ['ricetta', 'sop', 'otc'];
+            const forms = ['Compresse', 'Capsule', 'Sciroppo', 'Gocce', 'Bustine'];
+            
+            // Genera 1000 farmaci di esempio (nel reale saranno 72k)
+            for (let i = 0; i < 1000; i++) {
+                sampleDrugs.push({
+                    name: `${names[i % names.length]} ${Math.floor(Math.random() * 1000)}mg`,
+                    activeIngredient: actives[i % actives.length],
+                    company: `Azienda ${String.fromCharCode(65 + (i % 26))}`,
+                    atc: `N02BE0${(i % 9) + 1}`,
+                    type: types[i % types.length],
+                    aic: `02${String(i).padStart(7, '0')}`,
+                    form: forms[i % forms.length],
+                    dosage: `${Math.floor(Math.random() * 1000)}mg`,
+                    package: `${Math.floor(Math.random() * 50) + 10} ${forms[i % forms.length].toLowerCase()}`,
+                    price: `€ ${(Math.random() * 20 + 3).toFixed(2)}`,
+                    description: 'Descrizione del farmaco e delle sue indicazioni terapeutiche'
+                });
+            }
+            
+            return sampleDrugs;
+        }
+        
+        // Funzione di ricerca con debounce
+        function performSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const query = searchInput.value.toLowerCase().trim();
+                
+                // Filtra database
+                if (!query) {
+                    filteredDrugs = drugsDatabase.filter(drug => 
+                        currentFilter === 'all' || drug.type === currentFilter
+                    );
+                } else {
+                    filteredDrugs = drugsDatabase.filter(drug => {
+                        const matchesFilter = currentFilter === 'all' || drug.type === currentFilter;
+                        const matchesSearch = 
+                            drug.name.toLowerCase().includes(query) ||
+                            drug.activeIngredient.toLowerCase().includes(query) ||
+                            drug.atc.toLowerCase().includes(query) ||
+                            drug.company.toLowerCase().includes(query);
+                        
+                        return matchesFilter && matchesSearch;
+                    });
+                }
+                
+                // Ordina risultati
+                sortDrugs();
+                
+                // Reset paginazione
+                currentPage = 0;
+                displayedDrugs = [];
+                resultsDiv.innerHTML = '';
+                
+                // Carica prima pagina
+                loadMoreResults();
+                
+            }, 300); // Debounce di 300ms
+        }
+        
+        // Ordina farmaci
+        function sortDrugs() {
+            filteredDrugs.sort((a, b) => {
+                switch(currentSort) {
+                    case 'name':
+                        return a.name.localeCompare(b.name);
+                    case 'active':
+                        return a.activeIngredient.localeCompare(b.activeIngredient);
+                    case 'type':
+                        return a.type.localeCompare(b.type);
+                    default:
+                        return 0;
+                }
+            });
+        }
+        
+        // Carica più risultati (virtual scrolling)
+        function loadMoreResults() {
+            if (isLoading) return;
+            
+            const start = currentPage * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const newDrugs = filteredDrugs.slice(start, end);
+            
+            if (newDrugs.length === 0) {
+                if (filteredDrugs.length === 0 && currentPage === 0) {
+                    resultsDiv.innerHTML = `
+                        <div class="no-results">
+                            <div class="no-results-icon">🔍</div>
+                            <h3>Nessun farmaco trovato</h3>
+                            <p>Prova a modificare i criteri di ricerca</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            
+            isLoading = true;
+            
+            // Rimuovi messaggio di caricamento se è la prima pagina
+            if (currentPage === 0) {
+                resultsDiv.innerHTML = '';
+            }
+            
+            // Aggiungi nuovi risultati
+            newDrugs.forEach(drug => {
+                const card = createDrugCard(drug);
+                resultsDiv.appendChild(card);
+                displayedDrugs.push(drug);
+            });
+            
+            // Aggiorna contatori
+            updateCounters();
+            
+            currentPage++;
+            isLoading = false;
+            
+            // Mostra "caricamento" se ci sono altri risultati
+            if (end < filteredDrugs.length) {
+                const loadingMore = document.createElement('div');
+                loadingMore.className = 'loading-more';
+                loadingMore.id = 'loading-more';
+                loadingMore.textContent = 'Scorri per caricare altri risultati...';
+                resultsDiv.appendChild(loadingMore);
+            }
+        }
+        
+        // Crea card farmaco
+        function createDrugCard(drug) {
+            const card = document.createElement('div');
+            card.className = 'drug-card';
+            
+            card.innerHTML = `
+                <div class="drug-header">
+                    <div style="flex: 1;">
+                        <div class="drug-name">${drug.name}</div>
+                        <div class="drug-active">${drug.activeIngredient}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="drug-badge badge-${drug.type}">
+                            ${drug.type === 'ricetta' ? 'Ricetta' : drug.type.toUpperCase()}
+                        </span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                </div>
+                
+                <div class="drug-info">
+                    <div class="drug-info-row">
+                        <span class="info-label">🏢 Azienda:</span>
+                        <span class="info-value">${drug.company}</span>
+                    </div>
+                    <div class="drug-info-row">
+                        <span class="info-label">💊 Forma:</span>
+                        <span class="info-value">${drug.form} - ${drug.dosage}</span>
+                    </div>
+                </div>
+                
+                <div class="drug-details">
+                    <div class="drug-info">
+                        <div class="drug-info-row">
+                            <span class="info-label">🔢 AIC:</span>
+                            <span class="info-value">${drug.aic}</span>
+                        </div>
+                        <div class="drug-info-row">
+                            <span class="info-label">🏷️ ATC:</span>
+                            <span class="info-value">${drug.atc}</span>
+                        </div>
+                        <div class="drug-info-row">
+                            <span class="info-label">📦 Confezione:</span>
+                            <span class="info-value">${drug.package}</span>
+                        </div>
+                        <div class="drug-info-row">
+                            <span class="info-label">💰 Prezzo:</span>
+                            <span class="info-value">${drug.price}</span>
+                        </div>
+                        <div class="drug-info-row">
+                            <span class="info-label">ℹ️ Info:</span>
+                            <span class="info-value">${drug.description}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                card.classList.toggle('expanded');
+            });
+            
+            return card;
+        }
+        
+        // Aggiorna contatori
+        function updateCounters() {
+            resultsCount.textContent = filteredDrugs.length.toLocaleString('it-IT');
+            showingCount.textContent = displayedDrugs.length.toLocaleString('it-IT');
+            filteredCount.textContent = filteredDrugs.length.toLocaleString('it-IT');
+        }
+        
+        // Infinite scroll
+        resultsWrapper.addEventListener('scroll', () => {
+            const scrollHeight = resultsWrapper.scrollHeight;
+            const scrollTop = resultsWrapper.scrollTop;
+            const clientHeight = resultsWrapper.clientHeight;
+            
+            if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
+                // Rimuovi messaggio "loading-more"
+                const loadingMore = document.getElementById('loading-more');
+                if (loadingMore) {
+                    loadingMore.remove();
+                }
+                
+                loadMoreResults();
+            }
+        });
+        
+        // Event listeners
+        searchInput.addEventListener('input', performSearch);
+        
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                filterTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentFilter = tab.dataset.filter;
+                performSearch();
+            });
+        });
+        
+        sortSelect.addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            performSearch();
+        });
+        
+        // Inizializzazione
+        loadDrugsDatabase();
+    </script>
+</body>
+</html>

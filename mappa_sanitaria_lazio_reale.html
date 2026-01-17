@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Sanitaria Lazio - Dati Ministeriali</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css' type='text/css' />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        
+        .map-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1;
+            max-width: 320px;
+        }
+        
+        .map-overlay h3 {
+            margin-bottom: 15px;
+            color: #1a73e8;
+            font-size: 18px;
+        }
+        
+        .stats-box {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .stat-label {
+            color: #666;
+        }
+        
+        .stat-value {
+            font-weight: 700;
+            color: #1a73e8;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .filter-group input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .locate-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            transition: background 0.3s;
+        }
+        
+        .locate-btn:hover {
+            background: #1557b0;
+        }
+        
+        .locate-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .marker-farmacia {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="14" fill="%2310b981" stroke="white" stroke-width="2"/><text x="15" y="20" text-anchor="middle" fill="white" font-size="16" font-weight="bold">+</text></svg>');
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+        }
+        
+        .marker-ospedale {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="14" fill="%23ef4444" stroke="white" stroke-width="2"/><text x="15" y="20" text-anchor="middle" fill="white" font-size="16" font-weight="bold">H</text></svg>');
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+        }
+        
+        .mapboxgl-popup-content {
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 220px;
+        }
+        
+        .popup-title {
+            font-weight: 600;
+            color: #111;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        .popup-info {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .popup-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .popup-type.farmacia {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .popup-type.ospedale {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .geocoder-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1;
+            width: 300px;
+        }
+        
+        .mapboxgl-ctrl-geocoder {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            font-size: 18px;
+            color: #1a73e8;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+        
+        .data-source {
+            font-size: 11px;
+            color: #999;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        🔄 Caricamento dati ministeriali...
+    </div>
+    
+    <div id="map"></div>
+    
+    <div class="map-overlay">
+        <h3>🏥 Mappa Sanitaria Lazio</h3>
+        
+        <div class="stats-box">
+            <div class="stat-row">
+                <span class="stat-label">Farmacie:</span>
+                <span class="stat-value" id="stat-farmacie">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Ospedali:</span>
+                <span class="stat-value" id="stat-ospedali">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Totale:</span>
+                <span class="stat-value" id="stat-totale">0</span>
+            </div>
+        </div>
+        
+        <button id="locate-btn" class="locate-btn">📍 La mia posizione</button>
+        
+        <div class="filter-group">
+            <label>
+                <input type="checkbox" id="filter-farmacia" checked>
+                <span>💊 Mostra Farmacie</span>
+            </label>
+            <label>
+                <input type="checkbox" id="filter-ospedale" checked>
+                <span>🏥 Mostra Ospedali</span>
+            </label>
+        </div>
+        
+        <div class="data-source">
+            📊 Dati ufficiali:<br>
+            Ministero della Salute 2026
+        </div>
+    </div>
+    
+    <div id="geocoder" class="geocoder-container"></div>
+
+    <script>
+        // IMPORTANTE: Sostituisci con il tuo token Mapbox
+        // Ottienilo gratuitamente su: https://account.mapbox.com/
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example';
+        
+        // Inizializza mappa centrata su Roma
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [12.4964, 41.9028], // Roma
+            zoom: 10
+        });
+        
+        let farmacie = [];
+        let ospedali = [];
+        let markers = {
+            farmacie: [],
+            ospedali: []
+        };
+        
+        // Carica dati ministeriali
+        async function loadData() {
+            try {
+                // OPZIONE 1: Carica formato compatto (più leggero)
+                const response = await fetch('./mappa_compact.json');
+                const data = await response.json();
+                
+                // Espandi formato compatto
+                farmacie = data.f.map(f => ({
+                    nome: f.n,
+                    indirizzo: f.i,
+                    comune: f.c,
+                    lat: f.la,
+                    lng: f.lo,
+                    tipo: 'farmacia'
+                }));
+                
+                ospedali = data.o.map(o => ({
+                    nome: o.n,
+                    indirizzo: o.i,
+                    comune: o.c,
+                    lat: o.la,
+                    lng: o.lo,
+                    tipo: 'ospedale',
+                    categoria: o.cat
+                }));
+                
+                // OPZIONE 2: Carica formato completo (se preferisci)
+                // const response = await fetch('./mappa_sanitaria_lazio.json');
+                // const data = await response.json();
+                // farmacie = data.farmacie;
+                // ospedali = data.ospedali;
+                
+                console.log(`✅ Caricati ${farmacie.length} farmacie e ${ospedali.length} ospedali`);
+                
+                return { farmacie, ospedali };
+                
+            } catch (error) {
+                console.error('Errore caricamento dati:', error);
+                alert('Errore nel caricamento dei dati ministeriali');
+                return { farmacie: [], ospedali: [] };
+            }
+        }
+        
+        // Crea marker
+        function createMarker(location, type) {
+            const el = document.createElement('div');
+            el.className = `marker-${type}`;
+            
+            let popupContent = `
+                <div>
+                    <div class="popup-type ${type}">${type}</div>
+                    <div class="popup-title">${location.nome}</div>
+                    <div class="popup-info">
+                        📍 ${location.indirizzo}<br>
+                        🏘️ ${location.comune}
+            `;
+            
+            if (location.categoria) {
+                popupContent += `<br>🏥 ${location.categoria}`;
+            }
+            
+            popupContent += `</div></div>`;
+            
+            const popup = new mapboxgl.Popup({ offset: 25 })
+                .setHTML(popupContent);
+            
+            const marker = new mapboxgl.Marker(el)
+                .setLngLat([location.lng, location.lat])
+                .setPopup(popup)
+                .addTo(map);
+            
+            return marker;
+        }
+        
+        // Carica markers
+        function loadMarkers() {
+            // Pulisci markers esistenti
+            markers.farmacie.forEach(m => m.remove());
+            markers.ospedali.forEach(m => m.remove());
+            markers.farmacie = [];
+            markers.ospedali = [];
+            
+            const filterFarmacie = document.getElementById('filter-farmacia').checked;
+            const filterOspedali = document.getElementById('filter-ospedale').checked;
+            
+            // Aggiungi farmacie
+            if (filterFarmacie) {
+                farmacie.forEach(f => {
+                    const marker = createMarker(f, 'farmacia');
+                    markers.farmacie.push(marker);
+                });
+            }
+            
+            // Aggiungi ospedali
+            if (filterOspedali) {
+                ospedali.forEach(o => {
+                    const marker = createMarker(o, 'ospedale');
+                    markers.ospedali.push(marker);
+                });
+            }
+            
+            // Aggiorna stats
+            document.getElementById('stat-farmacie').textContent = farmacie.length;
+            document.getElementById('stat-ospedali').textContent = ospedali.length;
+            document.getElementById('stat-totale').textContent = farmacie.length + ospedali.length;
+        }
+        
+        // Inizializzazione
+        map.on('load', async () => {
+            // Aggiungi controlli
+            map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+            
+            const geolocate = new mapboxgl.GeolocateControl({
+                positionOptions: { enableHighAccuracy: true },
+                trackUserLocation: true,
+                showUserHeading: true
+            });
+            map.addControl(geolocate, 'bottom-right');
+            
+            // Geocoder
+            const geocoder = new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl,
+                placeholder: 'Cerca un indirizzo nel Lazio...',
+                countries: 'it',
+                bbox: [11.4, 41.0, 13.8, 42.9], // Lazio bounds
+                language: 'it'
+            });
+            document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
+            
+            // Carica dati
+            await loadData();
+            
+            // Carica markers
+            loadMarkers();
+            
+            // Nascondi loading
+            document.getElementById('loading').classList.add('hidden');
+            
+            // Auto-geolocalizza (opzionale)
+            // setTimeout(() => geolocate.trigger(), 1000);
+        });
+        
+        // Event listeners filtri
+        document.getElementById('filter-farmacia').addEventListener('change', loadMarkers);
+        document.getElementById('filter-ospedale').addEventListener('change', loadMarkers);
+        
+        // Pulsante geolocalizzazione
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            const btn = document.getElementById('locate-btn');
+            btn.disabled = true;
+            btn.textContent = '🔍 Ricerca posizione...';
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        
+                        map.flyTo({
+                            center: [longitude, latitude],
+                            zoom: 14,
+                            essential: true
+                        });
+                        
+                        new mapboxgl.Marker({ color: '#1a73e8' })
+                            .setLngLat([longitude, latitude])
+                            .setPopup(new mapboxgl.Popup().setHTML('<strong>Tu sei qui</strong>'))
+                            .addTo(map);
+                        
+                        btn.textContent = '✓ Posizione trovata';
+                        setTimeout(() => {
+                            btn.textContent = '📍 La mia posizione';
+                            btn.disabled = false;
+                        }, 2000);
+                    },
+                    (error) => {
+                        alert('Impossibile rilevare la posizione');
+                        btn.textContent = '📍 La mia posizione';
+                        btn.disabled = false;
+                    }
+                );
+            }
+        });
+    </script>
+</body>
+</html>
