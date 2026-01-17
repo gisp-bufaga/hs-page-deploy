@@ -273,7 +273,7 @@
         async function loadData() {
             try {
                 // OPZIONE 1: Carica formato compatto (più leggero)
-                const response = await fetch('./mappa_compact.json');
+                const response = await fetch('./data/mappa_compact.json');
                 const data = await response.json();
                 
                 // Espandi formato compatto

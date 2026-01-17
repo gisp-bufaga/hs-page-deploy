@@ -1,0 +1,24 @@
+# Node modules (se usi npm)
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# CSV originali (troppo grandi per Git)
+*.csv
+aifa_data/
+
+# File locali
+.DS_Store
+.env
+.env.local
+
+# Vercel
+.vercel
