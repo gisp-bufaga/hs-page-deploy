@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qualità dell'Aria - Health Kiosk</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .fresh-gradient {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%);
+        }
+        .gauge-rotate {
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body class="bg-[#f6f7f8] min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const BLYNK_CONFIG = {
+            token: 'FlZPhbwhamoiAymnYRqmoWBfNe3awn6T',
+            server: 'https://fra1.blynk.cloud',
+            pins: {
+                pm25: 'V2',
+                pm10: 'V4',
+                voc: 'V5',
+                nox: 'V6'
+            }
+        };
+
+        // Mappa colori esplicita per Tailwind JIT
+        const COLOR_CLASSES = {
+            emerald: { badge: 'bg-emerald-500', text: 'text-emerald-500', dot: 'bg-emerald-500' },
+            green:   { badge: 'bg-green-500',   text: 'text-green-500',   dot: 'bg-green-500'   },
+            yellow:  { badge: 'bg-yellow-500',  text: 'text-yellow-500',  dot: 'bg-yellow-500'  },
+            orange:  { badge: 'bg-orange-500',  text: 'text-orange-500',  dot: 'bg-orange-500'  },
+            red:     { badge: 'bg-red-500',     text: 'text-red-500',     dot: 'bg-red-500'     },
+            purple:  { badge: 'bg-purple-500',  text: 'text-purple-500',  dot: 'bg-purple-500'  },
+        };
+
+        const calculateIndex = (concentration, breakpoints) => {
+            if (concentration <= 0) return 0;
+            for (let bp of breakpoints) {
+                if (concentration >= bp.cLow && concentration <= bp.cHigh) {
+                    const { cLow, cHigh, iLow, iHigh } = bp;
+                    return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (concentration - cLow) + iLow);
+                }
+            }
+            return 500;
+        };
+
+        const calculateSubIndexPM25 = (v) => calculateIndex(v, [
+            { cLow: 0.0,   cHigh: 12.0,  iLow: 0,   iHigh: 50  },
+            { cLow: 12.1,  cHigh: 35.4,  iLow: 51,  iHigh: 100 },
+            { cLow: 35.5,  cHigh: 55.4,  iLow: 101, iHigh: 150 },
+            { cLow: 55.5,  cHigh: 150.4, iLow: 151, iHigh: 200 },
+            { cLow: 150.5, cHigh: 250.4, iLow: 201, iHigh: 300 },
+            { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 },
+        ]);
+
+        const calculateSubIndexPM10 = (v) => calculateIndex(v, [
+            { cLow: 0,   cHigh: 54,   iLow: 0,   iHigh: 50  },
+            { cLow: 55,  cHigh: 154,  iLow: 51,  iHigh: 100 },
+            { cLow: 155, cHigh: 254,  iLow: 101, iHigh: 150 },
+            { cLow: 255, cHigh: 354,  iLow: 151, iHigh: 200 },
+            { cLow: 355, cHigh: 424,  iLow: 201, iHigh: 300 },
+            { cLow: 425, cHigh: 604,  iLow: 301, iHigh: 500 },
+        ]);
+
+        const calculateSubIndexVOC = (v) => calculateIndex(v, [
+            { cLow: 0,     cHigh: 220,   iLow: 0,   iHigh: 50  },
+            { cLow: 221,   cHigh: 660,   iLow: 51,  iHigh: 100 },
+            { cLow: 661,   cHigh: 2200,  iLow: 101, iHigh: 150 },
+            { cLow: 2201,  cHigh: 5500,  iLow: 151, iHigh: 200 },
+            { cLow: 5501,  cHigh: 10000, iLow: 201, iHigh: 300 },
+            { cLow: 10001, cHigh: 25000, iLow: 301, iHigh: 500 },
+        ]);
+
+        const calculateSubIndexNOx = (v) => calculateIndex(v, [
+            { cLow: 0,    cHigh: 53,   iLow: 0,   iHigh: 50  },
+            { cLow: 54,   cHigh: 100,  iLow: 51,  iHigh: 100 },
+            { cLow: 101,  cHigh: 360,  iLow: 101, iHigh: 150 },
+            { cLow: 361,  cHigh: 649,  iLow: 151, iHigh: 200 },
+            { cLow: 650,  cHigh: 1249, iLow: 201, iHigh: 300 },
+            { cLow: 1250, cHigh: 2049, iLow: 301, iHigh: 500 },
+        ]);
+
+        const calculateAQI = (pm25, pm10, voc, nox) =>
+            Math.max(
+                calculateSubIndexPM25(pm25),
+                calculateSubIndexPM10(pm10),
+                calculateSubIndexVOC(voc),
+                calculateSubIndexNOx(nox)
+            );
+
+        const getAQIStatus = (aqi) => {
+            if (aqi <= 50)  return { label: 'OTTIMA',    color: 'emerald' };
+            if (aqi <= 100) return { label: 'BUONA',     color: 'green'   };
+            if (aqi <= 150) return { label: 'MODERATA',  color: 'yellow'  };
+            if (aqi <= 200) return { label: 'SCARSA',    color: 'orange'  };
+            if (aqi <= 300) return { label: 'PESSIMA',   color: 'red'     };
+            return              { label: 'PERICOLOSA', color: 'purple'  };
+        };
+
+        const getParameterStatus = (value, thresholds) => {
+            if (value <= thresholds.good)     return { label: 'Ottimo',   color: 'emerald' };
+            if (value <= thresholds.moderate) return { label: 'Moderato', color: 'yellow'  };
+            return                            { label: 'Alto',     color: 'red'     };
+        };
+
+        function AirQuality() {
+            const [data, setData] = useState({
+                aqi: 15, pm25: 6, pm10: 12, voc: 150, nox: 10,
+                status: 'OTTIMA', statusColor: 'emerald', dominantPollutant: 'PM2.5',
+                lastUpdate: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+            });
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            const fetchBlynkData = async () => {
+                try {
+                    const { token, server, pins } = BLYNK_CONFIG;
+                    const promises = Object.entries(pins).map(async ([key, pin]) => {
+                        const response = await fetch(`${server}/external/api/get?token=${token}&${pin}`);
+                        if (!response.ok) throw new Error(`Errore ${key}`);
+                        const value = await response.json();
+                        return [key, parseFloat(value) || 0];
+                    });
+                    const rawData = Object.fromEntries(await Promise.all(promises));
+                    const calculatedAQI = calculateAQI(rawData.pm25, rawData.pm10, rawData.voc, rawData.nox);
+                    const status = getAQIStatus(calculatedAQI);
+                    setData({
+                        aqi: calculatedAQI, ...rawData,
+                        status: status.label, statusColor: status.color,
+                        lastUpdate: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                    });
+                    setError(null);
+                } catch (err) {
+                    console.error('Errore Blynk:', err);
+                    setError('Impossibile recuperare i dati');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchBlynkData();
+                const interval = setInterval(fetchBlynkData, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const gaugePercentage = Math.min((data.aqi / 500) * 100, 100);
+            const gaugeDashOffset = 251 - (251 * gaugePercentage / 100);
+
+            const pm25Status = getParameterStatus(data.pm25, { good: 12, moderate: 35 });
+            const pm10Status = getParameterStatus(data.pm10, { good: 20, moderate: 50 });
+            const vocStatus  = getParameterStatus(data.voc,  { good: 220, moderate: 660 });
+            const noxStatus  = getParameterStatus(data.nox,  { good: 40, moderate: 100 });
+
+            const badgeColor = COLOR_CLASSES[data.statusColor] || COLOR_CLASSES.emerald;
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#137fec] mx-auto mb-4"></div>
+                            <p className="text-lg font-medium text-slate-600">Caricamento dati...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    <main className="flex-1 flex flex-col items-center py-8 px-6 md:px-10 max-w-[800px] mx-auto w-full">
+
+                        {error && (
+                            <div className="w-full max-w-2xl mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-center">
+                                {error} - Visualizzazione dati demo
+                            </div>
+                        )}
+
+                        {/* AQI Gauge */}
+                        <div className="w-full max-w-[500px] aspect-square relative flex items-center justify-center mb-8 fresh-gradient rounded-full shadow-inner border border-white/20">
+                            <div className="absolute inset-4 rounded-full border-[16px] border-slate-200/50"></div>
+                            <svg className="absolute inset-4 w-[calc(100%-32px)] h-[calc(100%-32px)] gauge-rotate">
+                                <defs>
+                                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#2dd4bf" />
+                                        <stop offset="100%" stopColor="#137fec" />
+                                    </linearGradient>
+                                </defs>
+                                <circle
+                                    cx="50%" cy="50%" r="40%"
+                                    fill="transparent"
+                                    stroke="url(#gradient)"
+                                    strokeWidth="16"
+                                    strokeDasharray="251"
+                                    strokeDashoffset={gaugeDashOffset}
+                                    strokeLinecap="round"
+                                    className="transition-all duration-1000"
+                                />
+                            </svg>
+                            <div className="text-center z-10">
+                                <p className="text-slate-500 text-lg font-medium mb-2 uppercase tracking-widest">AQI ATTUALE</p>
+                                <p className="text-[#137fec] text-7xl font-black leading-none mb-2">{Math.round(data.aqi)}</p>
+                                <div className={`inline-flex items-center px-4 py-1 rounded-full ${badgeColor.badge} text-white font-bold text-xl uppercase`}>
+                                    {data.status}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tips Panel */}
+                        <div className="w-full mb-8">
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl border border-[#137fec]/20 bg-[#137fec]/5 p-6 backdrop-blur-sm">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-[#137fec] text-white p-3 rounded-full flex items-center justify-center">
+                                        <span className="material-symbols-outlined">info</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-lg font-bold">Consigli del giorno</p>
+                                        <p className="text-base text-slate-600">
+                                            {data.aqi <= 50
+                                                ? "L'aria è pulita. È il momento perfetto per una passeggiata nel parco o attività all'aperto."
+                                                : data.aqi <= 100
+                                                ? "La qualità dell'aria è buona. Puoi svolgere attività all'aperto con moderazione."
+                                                : "Considera di limitare le attività all'aperto prolungate."}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button className="flex min-w-[120px] items-center justify-center rounded-lg h-12 px-6 bg-[#137fec] text-white text-sm font-bold shadow-lg hover:scale-105 transition-transform">
+                                    Più info
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Parameters Grid */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full mb-12">
+
+                            {/* PM2.5 */}
+                            <div className="flex flex-col gap-4 p-5 rounded-xl bg-white shadow-sm border border-[#e7edf3]">
+                                <div className="w-full h-24 bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute bottom-0 left-0 w-full bg-teal-500/10" style={{height: `${Math.min((data.pm25 / 35) * 100, 100)}%`}}></div>
+                                    <span className="material-symbols-outlined text-teal-600 text-4xl relative z-10">air</span>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-tighter">PM2.5</p>
+                                    <p className="text-2xl font-bold">{data.pm25.toFixed(1)} µg/m³</p>
+                                    <p className={`${COLOR_CLASSES[pm25Status.color].text} text-sm font-semibold flex items-center gap-1`}>
+                                        <span className={`w-2 h-2 ${COLOR_CLASSES[pm25Status.color].dot} rounded-full`}></span>
+                                        {pm25Status.label}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* PM10 */}
+                            <div className="flex flex-col gap-4 p-5 rounded-xl bg-white shadow-sm border border-[#e7edf3]">
+                                <div className="w-full h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute bottom-0 left-0 w-full bg-blue-500/10" style={{height: `${Math.min((data.pm10 / 50) * 100, 100)}%`}}></div>
+                                    <span className="material-symbols-outlined text-blue-600 text-4xl relative z-10">filter_drama</span>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-tighter">PM10</p>
+                                    <p className="text-2xl font-bold">{data.pm10.toFixed(1)} µg/m³</p>
+                                    <p className={`${COLOR_CLASSES[pm10Status.color].text} text-sm font-semibold flex items-center gap-1`}>
+                                        <span className={`w-2 h-2 ${COLOR_CLASSES[pm10Status.color].dot} rounded-full`}></span>
+                                        {pm10Status.label}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* VOC */}
+                            <div className="flex flex-col gap-4 p-5 rounded-xl bg-white shadow-sm border border-[#e7edf3]">
+                                <div className="w-full h-24 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute bottom-0 left-0 w-full bg-indigo-500/10" style={{height: `${Math.min((data.voc / 660) * 100, 100)}%`}}></div>
+                                    <span className="material-symbols-outlined text-indigo-600 text-4xl relative z-10">science</span>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-tighter">VOC</p>
+                                    <p className="text-2xl font-bold">{Math.round(data.voc)} ppb</p>
+                                    <p className={`${COLOR_CLASSES[vocStatus.color].text} text-sm font-semibold flex items-center gap-1`}>
+                                        <span className={`w-2 h-2 ${COLOR_CLASSES[vocStatus.color].dot} rounded-full`}></span>
+                                        {vocStatus.label}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* NOx */}
+                            <div className="flex flex-col gap-4 p-5 rounded-xl bg-white shadow-sm border border-[#e7edf3]">
+                                <div className="w-full h-24 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute bottom-0 left-0 w-full bg-orange-500/10" style={{height: `${Math.min((data.nox / 100) * 100, 100)}%`}}></div>
+                                    <span className="material-symbols-outlined text-orange-600 text-4xl relative z-10">warning</span>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-tighter">NOx</p>
+                                    <p className="text-2xl font-bold">{data.nox.toFixed(1)} µg/m³</p>
+                                    <p className={`${COLOR_CLASSES[noxStatus.color].text} text-sm font-semibold flex items-center gap-1`}>
+                                        <span className={`w-2 h-2 ${COLOR_CLASSES[noxStatus.color].dot} rounded-full`}></span>
+                                        {noxStatus.label}
+                                    </p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<AirQuality />, document.getElementById('root'));
+    </script>
+</body>
+</html>

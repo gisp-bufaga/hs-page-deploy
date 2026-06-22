@@ -1,6 +1,6 @@
 {
   "version": 2,
-"cleanUrls": true,
+  "cleanUrls": true,
   "trailingSlash": false,
   "headers": [
     {
@@ -42,12 +42,6 @@
           "value": "public, max-age=300, s-maxage=300"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
     }
   ]
 }

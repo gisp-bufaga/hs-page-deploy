@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Call - Health Kiosk</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background: #f6f7f8;
+        }
+        #root { width: 100%; height: 100%; overflow: hidden; }
+        .pulse-ring {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+        }
+        .calling-animation {
+            animation: calling 1s ease-in-out infinite;
+        }
+        @keyframes calling {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function EmergencyCall() {
+            const [countdown, setCountdown] = useState(5);
+            const [isActive, setIsActive] = useState(false);
+            const [isCalling, setIsCalling] = useState(false);
+            const [callDuration, setCallDuration] = useState(0);
+
+            useEffect(() => {
+                if (isActive && countdown > 0 && !isCalling) {
+                    const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+                    return () => clearTimeout(timer);
+                } else if (isActive && countdown === 0 && !isCalling) {
+                    setIsCalling(true);
+                }
+            }, [isActive, countdown, isCalling]);
+
+            useEffect(() => {
+                if (isCalling) {
+                    const timer = setInterval(() => setCallDuration(prev => prev + 1), 1000);
+                    return () => clearInterval(timer);
+                }
+            }, [isCalling]);
+
+            const handleEmergencyClick = () => {
+                setIsActive(true);
+                setCountdown(5);
+            };
+
+            const handleCancel = () => {
+                setIsActive(false);
+                setCountdown(5);
+                setIsCalling(false);
+                setCallDuration(0);
+            };
+
+            const formatTime = (seconds) => ({
+                minutes: String(Math.floor(seconds / 60)).padStart(2, '0'),
+                seconds: String(seconds % 60).padStart(2, '0')
+            });
+
+            const time = isCalling ? formatTime(callDuration) : formatTime(countdown);
+
+            return (
+                <div className="flex flex-col min-h-screen bg-[#f6f7f8]">
+                    <main className="flex-1 flex flex-col items-center justify-center px-12 w-full max-w-4xl mx-auto">
+
+                        {/* Header */}
+                        <div className="text-center mb-16">
+                            <h1 className="text-6xl font-extrabold uppercase mb-4 text-[#ef4444]">
+                                {isCalling ? 'Chiamata in Corso' : 'Chiamata Emergenza'}
+                            </h1>
+                            <p className="text-2xl font-medium text-slate-600">
+                                {isCalling ? 'Collegamento con 112 stabilito' : 'Tocca il pulsante per assistenza immediata'}
+                            </p>
+                        </div>
+
+                        {/* Emergency Button */}
+                        <div className="relative py-20">
+                            {(isActive || isCalling) && (
+                                <>
+                                    <div className="absolute inset-0 bg-[#ef4444]/10 rounded-full scale-110 pulse-ring"></div>
+                                    <div className="absolute inset-0 bg-[#ef4444]/5 rounded-full scale-125 pulse-ring" style={{animationDelay: '0.5s'}}></div>
+                                </>
+                            )}
+                            <button
+                                onClick={handleEmergencyClick}
+                                disabled={isActive}
+                                className={`relative flex flex-col items-center justify-center rounded-full bg-[#ef4444] text-white shadow-2xl transition-all border-8 border-white group ${
+                                    isActive ? 'cursor-not-allowed' : 'hover:bg-red-600 active:scale-95'
+                                } ${isCalling ? 'calling-animation' : ''}`}
+                                style={{ width: '320px', height: '320px' }}
+                            >
+                                <span className="material-symbols-outlined group-hover:scale-110 transition-transform" style={{ fontSize: '90px' }}>
+                                    {isCalling ? 'call' : 'phone_in_talk'}
+                                </span>
+                                <span className="text-3xl font-black uppercase px-8 text-center leading-none mt-4">
+                                    {isCalling ? 'IN LINEA' : 'AVVIA CHIAMATA'}
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* Timer / Status */}
+                        <div className="w-full max-w-3xl mt-8 space-y-4">
+                            {isActive && (
+                                <div className="bg-white rounded-xl p-10 shadow-sm border border-[#e7edf3]">
+                                    <p className="text-center text-xl font-semibold mb-6 uppercase tracking-wider">
+                                        {isCalling ? 'Durata chiamata' : "L'allarme partirà tra..."}
+                                    </p>
+                                    <div className="flex gap-6 justify-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="flex items-center justify-center rounded-lg bg-[#e7edf3]" style={{ height: '100px', width: '120px' }}>
+                                                <p className="text-[#ef4444] text-5xl font-black">{time.minutes}</p>
+                                            </div>
+                                            <p className="text-slate-600 text-base font-bold uppercase">Minuti</p>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="flex items-center justify-center rounded-lg bg-[#e7edf3]" style={{ height: '100px', width: '120px' }}>
+                                                <p className="text-[#ef4444] text-5xl font-black">{time.seconds}</p>
+                                            </div>
+                                            <p className="text-slate-600 text-base font-bold uppercase">Secondi</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-8 flex justify-center">
+                                        <button
+                                            onClick={handleCancel}
+                                            className="flex min-w-[280px] items-center justify-center rounded-full h-16 px-8 bg-slate-100 border-2 border-slate-300 text-base font-black uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                                        >
+                                            {isCalling ? 'Termina' : 'Annulla'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Location */}
+                        <div className="mt-12 w-full bg-[#137fec]/5 rounded-2xl p-10 border-l-4 border-[#137fec]">
+                            <div className="flex items-start gap-6">
+                                <span className="material-symbols-outlined text-[#137fec] mt-1" style={{ fontSize: '48px' }}>location_on</span>
+                                <div>
+                                    <h3 className="text-lg font-bold text-[#137fec] uppercase tracking-widest mb-2">Sei presso:</h3>
+                                    <p className="text-3xl font-bold leading-tight">Punto Accesso Via Ostiense 72</p>
+                                    <p className="text-lg text-slate-500 mt-2 italic">I soccorsi verranno inviati a questo indirizzo.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Emergency Numbers */}
+                        <div className="mt-8 grid grid-cols-2 gap-6 w-full">
+                            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl border border-[#e7edf3]">
+                                <span className="text-[#ef4444] font-black text-5xl">112</span>
+                                <span className="text-base font-bold text-slate-500 uppercase mt-2">Numero Unico</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl border border-[#e7edf3]">
+                                <span className="text-[#ef4444] font-black text-5xl">118</span>
+                                <span className="text-base font-bold text-slate-500 uppercase mt-2">Emergenza Sanitaria</span>
+                            </div>
+                        </div>
+                    </main>
+
+                    <footer className="p-10 text-center text-slate-400 text-sm uppercase tracking-wider font-medium">
+                        Sistema di monitoraggio attivo • HealthPoint Emergency Services
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<EmergencyCall />, document.getElementById('root'));
+    </script>
+</body>
+</html>
